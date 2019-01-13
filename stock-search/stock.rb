@@ -1,67 +1,65 @@
 #!/usr/bin/env ruby
 # CLI app that searches stock info by symbol.
 
-require 'rest-client'
 require 'json'
+require 'uri'
+require 'net/http'
+require 'colorize'
 
 def stock_search
-  puts
-  print 'Stock => '
-  symbol = gets.chomp
 
-  if symbol == 'quit' || symbol == 'exit'
-    exit(1)
-  else
-    begin
-      # Takes user input and generates ticker symbol.
-      url = "http://d.yimg.com/autoc.finance.yahoo.com/autoc?query=#{symbol}&region=1&lang=en%22"
-      response = RestClient.get(url)
-      parsed = JSON.parse(response)
-      parsed_symbol = parsed['ResultSet']['Result'][0]['symbol']
-    rescue
-      puts
-      puts 'Invalid Search'
-      puts
-      exit(1)
-    end
+  symbol = ARGV.join(" ")
 
-    # Rest API to fetch current JSON data.
-    url = "http://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=#{parsed_symbol}&apikey=946DU3BV54DQIGIK"
-    response = RestClient.get(url)
+  # Takes user input and generates ticker symbol.
+  begin
+    uri = URI("http://d.yimg.com/autoc.finance.yahoo.com/autoc?query=#{symbol}&lang=en%22")
+    response = Net::HTTP.get(uri)
     parsed = JSON.parse(response)
-
-    # Check API response validity.
-    if parsed['Realtime Global Securities Quote'].empty?
-      puts
-      puts 'No Stock Found'
-      puts
-      exit(1)
-    else
-      # Assign variables to hash key values.
-      parsed_symbol = parsed['Realtime Global Securities Quote']['01. Symbol']
-      parsed_price = parsed['Realtime Global Securities Quote']['03. Latest Price']
-      parsed_open = parsed['Realtime Global Securities Quote']['04. Open (Current Trading Day)']
-      parsed_high = parsed['Realtime Global Securities Quote']['05. High (Current Trading Day)']
-      parsed_price_chg = parsed['Realtime Global Securities Quote']['08. Price Change']
-      parsed_price_pct = parsed['Realtime Global Securities Quote']['09. Price Change Percentage']
-      parsed_volume = parsed['Realtime Global Securities Quote']['10. Volume (Current Trading Day)']
-      parsed_exchange = parsed['Realtime Global Securities Quote']['02. Exchange Name']
-
-      # Output of parsed hash.
-      puts
-      puts '======================'
-      puts "| Symbol: #{parsed_symbol}"
-      puts "| Price: $#{parsed_price}"
-      puts "| Open: $#{parsed_open}"
-      puts "| High: $#{parsed_high}"
-      puts "| Price Chg: $#{parsed_price_chg}"
-      puts "| Price Chg % : #{parsed_price_pct}"
-      puts "| Volume: #{parsed_volume}"
-      puts "| Echange: #{parsed_exchange}"
-      puts '======================'
-      puts
-    end
+    parsed_symbol = parsed['ResultSet']['Result'][0]['symbol'].split(".")[0]
+  rescue
+    puts "Stock not found"
+    exit(1)
   end
+
+  # Use ticker symbol to fetch quote data
+  uri = URI("https://api.iextrading.com/1.0/stock/#{parsed_symbol}/quote")
+  response = Net::HTTP.get(uri)
+  if response == "Unknown symbol"
+    puts "Stock not found"
+    exit(1)
+  end
+  quote = JSON.parse(response)
+
+  # Shorten exchange string
+  case quote['primaryExchange']
+    when "Nasdaq Global Select"
+      exchange = "NASDAQ"
+    when "New York Stock Exchange"
+      exchange = "NYSE"
+  end
+  
+  puts "=========================="
+  puts "Symbol: #{quote['symbol']}"
+  puts "Price: $#{quote['latestPrice']}"
+
+  # Color output for price change
+  if quote['change'].positive?
+    puts "Chg: " + "+#{quote['change']}".green
+  else
+    puts "Chg: " + "#{quote['change']}".red
+  end
+
+  # Color output for percent price change
+  if quote['changePercent'].positive?
+    puts "Chg %: " + "+#{quote['changePercent']}%".green
+  else
+    puts "Chg %: " + "#{quote['changePercent']}%".red
+  end
+
+  puts "PE Ratio: #{quote['peRatio']}"
+  puts "Mkt Cap: $#{quote['marketCap']}"
+  puts "Exchange: #{exchange}"
+  puts "=========================="
 end
 
 stock_search

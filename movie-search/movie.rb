@@ -1,10 +1,11 @@
 #!/usr/bin/env ruby
 # CLI app that searched movies and returns info
 
-require 'rest-client'
 require 'json'
+require 'uri'
+require 'net/http'
 
-# Word wrapping method
+# Word wrapping for consise output
 def wrap(s, width = 78)
   s.gsub(/(.{1,#{width}})(\s+|\Z)/, "\\1\n| ")
 end
@@ -13,17 +14,15 @@ def movie
   # This is a live API key, don't absue it
   api_key = ENV['OMDBAPI_API_KEY'] || '946f500a'
 
-  puts
-  print 'Movie =>  '
-  movie_name = gets.chomp
+  movie_name = ARGV
 
   # Program escape statements
   if movie_name == 'quit' || movie_name == 'exit'
     puts
     exit(1)
   else
-    url = "http://www.omdbapi.com/?t=#{movie_name}&apikey=#{api_key}"
-    response = RestClient.get(url)
+    uri = URI("http://www.omdbapi.com/?t=#{movie_name}&apikey=#{api_key}")
+    response = Net::HTTP.get(uri)
     info = JSON.parse(response)
   end
 
@@ -51,7 +50,6 @@ def movie
     plot_unformatted = info['Plot']
     plot = wrap(plot_unformatted, 48)
 
-    puts
     puts '=================================================='
     puts "| Title: #{title}"
     puts "| Year: #{year}"
@@ -62,7 +60,6 @@ def movie
     puts "| Actors: #{actors}"
     puts "| Plot: #{plot}"
     puts '=================================================='
-    puts
   end
 end
 
